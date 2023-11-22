@@ -1,0 +1,13 @@
+{
+  "name": "signing",
+  "packageManager": "yarn@3.6.1",
+  "scripts": {
+    "example:run": "ts-node main.ts"
+  },
+  "dependencies": {
+    "@polkadot/api": "^10.11.1",
+    "@polkadot/util-crypto": "^12.6.1",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.2.2"
+  }
+}
