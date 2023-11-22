@@ -2,7 +2,6 @@ import { mnemonicGenerate } from "@polkadot/util-crypto";
 import { waitReady } from "@polkadot/wasm-crypto";
 import { Keyring } from "@polkadot/keyring";
 import { ApiPromise, WsProvider } from "@polkadot/api";
-import { hexToU8a } from '@polkadot/util';
 
 // Modify as necessary
 const API_URL = "ws://127.0.0.1:9933";
