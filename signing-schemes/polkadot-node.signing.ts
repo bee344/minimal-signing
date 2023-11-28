@@ -2,6 +2,8 @@ import { mnemonicGenerate } from "@polkadot/util-crypto";
 import { waitReady } from "@polkadot/wasm-crypto";
 import { Keyring } from "@polkadot/keyring";
 import { ApiPromise, WsProvider } from "@polkadot/api";
+import { SignerPayloadJSON } from "@polkadot/types/types";
+import { u8aToHex } from '@polkadot/util'
 
 // Modify as necessary
 const API_URL = "ws://127.0.0.1:9933";
@@ -25,11 +27,10 @@ export const sign = async () => {
 		address,
         1
 	);
+	const payload = await buildPayload(api, tx, address);
+	// Both extrinsicPayload and encodedCall need to be passed
+	const extrinsicPayload = api.registry.createType('ExtrinsicPayload', payload).toHex();
 	const encodedCall = tx.toHex();
-	const submittableExtrinsic = api.tx(encodedCall);
-
-	const payload = await buildPayload(api, submittableExtrinsic, address);
-	const extrinsicPayload = api.registry.createType('ExtrinsicPayload', payload);
 
 	const signer = keyring.addFromJson({
 		address,
@@ -39,11 +40,15 @@ export const sign = async () => {
 	});
 	signer.unlock();
 	
-	const signature = extrinsicPayload.sign(signer).signature;
-	submittableExtrinsic.addSignature(signer.address, signature, extrinsicPayload.toHex());
+	const signature = signer.sign(extrinsicPayload, { withType: true });
+	// We pass the encodedSignature
+	const encodedSignature = u8aToHex(signature);
+	
+	const call = api.tx(encodedCall)
+	call.addSignature(signer.address, encodedSignature, extrinsicPayload);
 
 	try {
-		const _ = await api.rpc.author.submitExtrinsic(submittableExtrinsic.toHex());
+		const _ = await api.rpc.author.submitExtrinsic(call.toHex());
 		console.log({
 			message: "Call submitted successfully",
 		});
@@ -59,7 +64,7 @@ const buildPayload = async (
 	api: ApiPromise,
 	tx: any, // SubmittableExtrinsic, actually
 	sender: string
-): Promise<any> => {
+): Promise<SignerPayloadJSON> => {
 	const lastHeader = await api.rpc.chain.getHeader();
 	const blockNumber = api.registry.createType(
 		"BlockNumber",
