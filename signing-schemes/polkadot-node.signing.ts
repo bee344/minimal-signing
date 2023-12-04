@@ -2,11 +2,11 @@ import { mnemonicGenerate } from "@polkadot/util-crypto";
 import { waitReady } from "@polkadot/wasm-crypto";
 import { Keyring } from "@polkadot/keyring";
 import { ApiPromise, WsProvider } from "@polkadot/api";
-import { SignerPayloadJSON } from "@polkadot/types/types";
-import { u8aToHex } from '@polkadot/util'
+import { SignerPayloadJSON, ISubmittableResult } from "@polkadot/types/types";
+import { SubmittableExtrinsic } from "@polkadot/api/types";
 
 // Modify as necessary
-const API_URL = "ws://127.0.0.1:9933";
+const API_URL = "ws://127.0.0.1:9910";
 
 export const sign = async () => {
 	await waitReady();
@@ -22,17 +22,19 @@ export const sign = async () => {
 	const provider = new WsProvider(API_URL);
 	const api = await ApiPromise.create({ provider });
 
-	const tx = await api.tx.assets.create(
+	const tx = api.tx.assets.create(
 		1,
 		address,
         1
 	);
 	const payload = await buildPayload(api, tx, address);
 	// Both extrinsicPayload and encodedCall need to be passed
-	const extrinsicPayload = api.registry.createType('ExtrinsicPayload', payload).toHex();
+	const newExtrinsicPayload = api.createType('ExtrinsicPayload', payload);
+	const extrinsicPayload = newExtrinsicPayload.toHex()
 	const encodedCall = tx.toHex();
 
-	const signer = keyring.addFromJson({
+	// Heads up: doing this or const signer = keyring.createFromJson(wallet) is the same
+	const signer = keyring.createFromJson({
 		address,
 		meta: {},
 		encoding: { content: ["pkcs8", "sr25519"], type: ["none"], version: "3" },
@@ -40,15 +42,17 @@ export const sign = async () => {
 	});
 	signer.unlock();
 	
-	const signature = signer.sign(extrinsicPayload, { withType: true });
+	// For doing this fully offline you could use an injected registry
+	const signature = newExtrinsicPayload.sign(signer).signature;
 	// We pass the encodedSignature
-	const encodedSignature = u8aToHex(signature);
-	
+
 	const call = api.tx(encodedCall)
-	call.addSignature(signer.address, encodedSignature, extrinsicPayload);
+	const extrinsic = api.registry.createType('Extrinsic', { method: call.method }, { version: call.version });
+
+	extrinsic.addSignature(signer.address, signature, extrinsicPayload);
 
 	try {
-		const _ = await api.rpc.author.submitExtrinsic(call.toHex());
+		const _ = await api.rpc.author.submitExtrinsic(extrinsic.toHex());
 		console.log({
 			message: "Call submitted successfully",
 		});
@@ -62,7 +66,8 @@ export const sign = async () => {
 
 const buildPayload = async (
 	api: ApiPromise,
-	tx: any, // SubmittableExtrinsic, actually
+	tx: SubmittableExtrinsic<"promise", ISubmittableResult>
+	, // SubmittableExtrinsic, actually
 	sender: string
 ): Promise<SignerPayloadJSON> => {
 	const lastHeader = await api.rpc.chain.getHeader();

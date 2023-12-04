@@ -8,8 +8,8 @@
 		"example:run": "ts-node main.ts"
 	},
 	"dependencies": {
-		"@polkadot/api": "^10.9.1",
-		"ts-node": "^10.9.1",
-		"typescript": "^5.2.2"
+		"@polkadot/api": "10.11.1",
+		"ts-node": "10.9.1",
+		"typescript": "5.3.2"
 	}
 }
